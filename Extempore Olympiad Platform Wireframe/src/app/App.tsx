@@ -8,7 +8,7 @@ import { RestPage } from "./components/RestPage";
 import { SubmissionPage } from "./components/SubmissionPage";
 import { ResultPendingPage } from "./components/ResultPendingPage";
 import { ResultApprovedPage } from "./components/ResultApprovedPage";
-import { AdminPanel } from "./components/AdminPanel";
+import { AdminDashboard } from "./components/AdminDashboard";
 
 export default function App() {
   return (
@@ -23,7 +23,7 @@ export default function App() {
         <Route path="/submission" element={<SubmissionPage />} />
         <Route path="/result-pending" element={<ResultPendingPage />} />
         <Route path="/result-approved" element={<ResultApprovedPage />} />
-        <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/admin" element={<AdminDashboard />} />
       </Routes>
 
       {/* Quick Navigation Panel (For Demo) */}
@@ -37,7 +37,7 @@ export default function App() {
           <Link to="/submission" className="text-[#1B6B8A] hover:underline">5. Submission</Link>
           <Link to="/result-pending" className="text-[#1B6B8A] hover:underline">6. Result Pending</Link>
           <Link to="/result-approved" className="text-[#1B6B8A] hover:underline">7. Result Approved</Link>
-          <Link to="/admin" className="text-[#1B6B8A] hover:underline">8. Admin Panel</Link>
+          <Link to="/admin" className="text-[#1B6B8A] hover:underline">8. Admin Dashboard</Link>
         </div>
       </div>
       </ExamProvider>
