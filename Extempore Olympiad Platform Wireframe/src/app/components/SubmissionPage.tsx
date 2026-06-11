@@ -6,7 +6,60 @@ import { useExam, type RoundNumber } from "../context/ExamContext";
 type UploadPhase = "uploading" | "success";
 
 const ROUNDS: RoundNumber[] = [1, 2, 3];
-const SUBMIT_URL = "http://localhost:8000/api/submit-exam/";
+const SUBMIT_URL = "http://localhost:8000/api/submissions";
+
+function getStudentId(): string {
+  const storedStudentId = window.localStorage.getItem("student_id");
+  if (storedStudentId) {
+    return storedStudentId;
+  }
+
+  const generatedStudentId = `STU-${window.crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  window.localStorage.setItem("student_id", generatedStudentId);
+  return generatedStudentId;
+}
+
+export async function submitExtemporeAudio({
+  audioBlob,
+  studentId,
+  gradeLevel,
+  roundNumber,
+}: {
+  audioBlob: Blob;
+  studentId: string;
+  gradeLevel: string;
+  roundNumber: RoundNumber;
+}): Promise<Record<string, unknown>> {
+  const formData = new FormData();
+  const fileExtension = audioBlob.type.includes("wav") ? "wav" : "webm";
+  const fileName = `student-${studentId}-round-${roundNumber}.${fileExtension}`;
+
+  formData.append("audio", audioBlob, fileName);
+  formData.append("student_id", studentId);
+  formData.append("grade_level", gradeLevel);
+  formData.append("round_number", String(roundNumber));
+
+  try {
+    const response = await fetch(SUBMIT_URL, {
+      method: "POST",
+      body: formData,
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+      throw new Error(
+        `Upload failed (${response.status}): ${responseText || response.statusText}`
+      );
+    }
+
+    const data = responseText ? JSON.parse(responseText) : {};
+    console.log("Extempore upload response:", data);
+    return data;
+  } catch (error) {
+    console.error("submitExtemporeAudio failed:", error);
+    throw error;
+  }
+}
 
 async function handleUpload(
   recordings: Partial<Record<RoundNumber, Blob>>,
@@ -14,6 +67,7 @@ async function handleUpload(
   onProgress: (percent: number) => void
 ): Promise<void> {
   const roundsWithAudio = ROUNDS.filter((round) => recordings[round]);
+  const studentId = getStudentId();
 
   if (roundsWithAudio.length === 0) {
     throw new Error("No recordings available to upload");
@@ -23,22 +77,12 @@ async function handleUpload(
     const round = roundsWithAudio[i];
     const blob = recordings[round]!;
 
-    const formData = new FormData();
-    formData.append("grade_level", grade);
-    formData.append("round_number", String(round));
-    formData.append("audio_file", blob, `round${round}.webm`);
-
-    const response = await fetch(SUBMIT_URL, {
-      method: "POST",
-      body: formData,
+    await submitExtemporeAudio({
+      audioBlob: blob,
+      studentId,
+      gradeLevel: grade,
+      roundNumber: round,
     });
-
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(
-        `Round ${round} failed (${response.status}): ${detail || response.statusText}`
-      );
-    }
 
     onProgress(Math.round(((i + 1) / roundsWithAudio.length) * 100));
   }
