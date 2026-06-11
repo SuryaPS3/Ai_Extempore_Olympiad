@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Clock } from "lucide-react";
 import { useExam } from "../context/ExamContext";
@@ -6,6 +7,26 @@ export function RoundPrepPage() {
   const navigate = useNavigate();
   const { currentRound, getRoundConfig } = useExam();
   const roundConfig = getRoundConfig();
+  const [secondsLeft, setSecondsLeft] = useState(roundConfig.prepSeconds);
+
+  useEffect(() => {
+    setSecondsLeft(roundConfig.prepSeconds);
+  }, [currentRound, roundConfig.prepSeconds]);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      navigate("/recording");
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      setSecondsLeft((previous) => previous - 1);
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [secondsLeft, navigate]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center pt-28 pb-8 px-4">
@@ -28,12 +49,16 @@ export function RoundPrepPage() {
           <div className="flex items-center justify-center gap-2 mb-2">
             <Clock className="w-8 h-8 text-[#1E293B]" />
             <span className="text-4xl font-bold text-[#1E293B]">
-              {Math.floor(roundConfig.prepSeconds / 60)}:
-              {(roundConfig.prepSeconds % 60).toString().padStart(2, "0")}
+              {Math.floor(Math.max(secondsLeft, 0) / 60)}:
+              {(Math.max(secondsLeft, 0) % 60).toString().padStart(2, "0")}
             </span>
             <span className="text-xl text-[#475569]">(prep)</span>
           </div>
-          <p className="text-[#475569] text-sm">Take your time to prepare</p>
+          <p className="text-[#475569] text-sm">
+            {secondsLeft > 0
+              ? "Take your time to prepare"
+              : "Preparation complete. Moving to the recording screen..."}
+          </p>
         </div>
 
         {/* Topic Card */}

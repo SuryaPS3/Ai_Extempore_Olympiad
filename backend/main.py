@@ -9,14 +9,16 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from database import Base, engine, get_db
 from models import Submission
+from transcription import transcribe_audio_task
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
@@ -81,6 +83,48 @@ def health_check():
     return {"status": "ok", "message": "Extempore Olympiad API is running"}
 
 
+@app.get("/api/submissions")
+def list_submissions(db: Session = Depends(get_db)):
+    """Return all submissions with the most recent rows first."""
+    submissions = db.query(Submission).order_by(Submission.id.desc()).all()
+    return [submission.to_dict() for submission in submissions]
+
+
+class SubmissionUpdate(BaseModel):
+    status: Optional[str] = None
+    final_score: Optional[float] = None
+    ai_feedback: Optional[str] = None
+    transcript: Optional[str] = None
+    ai_score: Optional[float] = None
+
+
+@app.patch("/api/submissions/{submission_id}")
+def update_submission(
+    submission_id: int,
+    payload: SubmissionUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update review fields for a submission and persist them in MySQL."""
+    submission = db.get(Submission, submission_id)
+    if submission is None:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    if payload.status is not None:
+        submission.status = payload.status.strip().upper()
+    if payload.final_score is not None:
+        submission.final_score = payload.final_score
+    if payload.ai_feedback is not None:
+        submission.ai_feedback = payload.ai_feedback.strip()
+    if payload.transcript is not None:
+        submission.transcript = payload.transcript.strip()
+    if payload.ai_score is not None:
+        submission.ai_score = payload.ai_score
+
+    db.commit()
+    db.refresh(submission)
+    return submission.to_dict()
+
+
 def _pick_upload_field(
     audio: Optional[UploadFile], audio_file: Optional[UploadFile]
 ) -> UploadFile:
@@ -129,6 +173,7 @@ def _create_submission_record(
 
     filename = _save_audio_file(upload)
     audio_url = _build_audio_url(request, filename)
+    file_path = UPLOAD_DIR / filename
 
     submission = Submission(
         student_id=student_id.strip(),
@@ -153,12 +198,13 @@ def _create_submission_record(
             file_path.unlink()
         raise
 
-    return submission.to_dict()
+    return submission, file_path
 
 
 @app.post("/api/submissions")
 @app.post("/api/submit-exam/")
 async def submit_submission(
+    background_tasks: BackgroundTasks,
     request: Request,
     student_id: str = Form(...),
     grade_level: str = Form(...),
@@ -173,7 +219,7 @@ async def submit_submission(
     The endpoint accepts either `audio` or the legacy `audio_file` field.
     """
     upload = _pick_upload_field(audio, audio_file)
-    return _create_submission_record(
+    submission, file_path = _create_submission_record(
         db=db,
         request=request,
         student_id=student_id,
@@ -181,3 +227,5 @@ async def submit_submission(
         round_number=round_number,
         upload=upload,
     )
+    background_tasks.add_task(transcribe_audio_task, submission.id, str(file_path))
+    return submission.to_dict()
