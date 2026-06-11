@@ -9,7 +9,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from database import Base, engine, get_db
 from models import Submission
+from transcription import transcribe_audio_task
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
@@ -129,6 +130,7 @@ def _create_submission_record(
 
     filename = _save_audio_file(upload)
     audio_url = _build_audio_url(request, filename)
+    file_path = UPLOAD_DIR / filename
 
     submission = Submission(
         student_id=student_id.strip(),
@@ -153,12 +155,13 @@ def _create_submission_record(
             file_path.unlink()
         raise
 
-    return submission.to_dict()
+    return submission, file_path
 
 
 @app.post("/api/submissions")
 @app.post("/api/submit-exam/")
 async def submit_submission(
+    background_tasks: BackgroundTasks,
     request: Request,
     student_id: str = Form(...),
     grade_level: str = Form(...),
@@ -173,7 +176,7 @@ async def submit_submission(
     The endpoint accepts either `audio` or the legacy `audio_file` field.
     """
     upload = _pick_upload_field(audio, audio_file)
-    return _create_submission_record(
+    submission, file_path = _create_submission_record(
         db=db,
         request=request,
         student_id=student_id,
@@ -181,3 +184,5 @@ async def submit_submission(
         round_number=round_number,
         upload=upload,
     )
+    background_tasks.add_task(transcribe_audio_task, submission.id, str(file_path))
+    return submission.to_dict()
