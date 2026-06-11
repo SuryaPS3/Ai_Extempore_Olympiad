@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   CheckCircle2,
@@ -10,16 +10,7 @@ import {
   Shield,
 } from "lucide-react";
 
-type SubmissionStatus = "PENDING" | "APPROVED";
-
-interface RubricScores {
-  content: number;
-  clarity: number;
-  confidence: number;
-  creativity: number;
-  timeManagement: number;
-  overallImpact: number;
-}
+type SubmissionStatus = "PENDING" | "APPROVED" | string;
 
 interface AdminSubmission {
   id: number;
@@ -27,201 +18,14 @@ interface AdminSubmission {
   grade_level: string;
   round_number: number;
   audio_url: string;
-  transcript: string;
-  ai_feedback: string;
-  ai_score: number;
-  rubric: RubricScores;
-  final_score: number;
+  transcript: string | null;
+  ai_feedback: string | null;
+  ai_score: number | null;
+  final_score: number | null;
   status: SubmissionStatus;
 }
 
-const RUBRIC_LABELS: { key: keyof RubricScores; label: string; max: number }[] = [
-  { key: "content", label: "Content", max: 20 },
-  { key: "clarity", label: "Clarity", max: 20 },
-  { key: "confidence", label: "Confidence", max: 15 },
-  { key: "creativity", label: "Creativity", max: 15 },
-  { key: "timeManagement", label: "Time Management", max: 15 },
-  { key: "overallImpact", label: "Overall Impact", max: 15 },
-];
-
-const INITIAL_SUBMISSIONS: AdminSubmission[] = [
-  {
-    id: 1,
-    student_id: "STU-1042",
-    grade_level: "Class 6",
-    round_number: 1,
-    audio_url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    transcript:
-      "If I became President of America for one day, the first thing I would do is make school lunches free for every child. I would also plant trees in every neighborhood and ask scientists to help us clean the oceans. I believe children should have a voice in decisions because we are the future.",
-    ai_feedback:
-      "Strong topical relevance with a clear opening. Ideas are well structured, though transitions between policy points could be smoother.",
-    ai_score: 82,
-    rubric: {
-      content: 17,
-      clarity: 16,
-      confidence: 13,
-      creativity: 14,
-      timeManagement: 12,
-      overallImpact: 10,
-    },
-    final_score: 82,
-    status: "PENDING",
-  },
-  {
-    id: 2,
-    student_id: "STU-1042",
-    grade_level: "Class 6",
-    round_number: 2,
-    audio_url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-    transcript:
-      "In a world where animals could talk, the first change would be at breakfast. My dog would complain about cereal, and birds would negotiate traffic rules from the sky. Schools would hire dolphins as swimming coaches, and cats would finally explain why they knock things off tables.",
-    ai_feedback:
-      "Highly creative narrative with vivid imagery. Pacing is energetic; a stronger conclusion would elevate the overall impact.",
-    ai_score: 88,
-    rubric: {
-      content: 16,
-      clarity: 17,
-      confidence: 14,
-      creativity: 18,
-      timeManagement: 13,
-      overallImpact: 10,
-    },
-    final_score: 88,
-    status: "PENDING",
-  },
-  {
-    id: 3,
-    student_id: "STU-1042",
-    grade_level: "Class 6",
-    round_number: 3,
-    audio_url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-    transcript:
-      "Across the galaxy, a whisper traveled over an old bridge built with courage. The speaker used each mystery word naturally while describing a journey between stars, showing that bravery connects people even when worlds feel far apart.",
-    ai_feedback:
-      "All challenge words were integrated successfully. Delivery was confident, but some sentences were rushed near the end.",
-    ai_score: 79,
-    rubric: {
-      content: 15,
-      clarity: 15,
-      confidence: 14,
-      creativity: 13,
-      timeManagement: 11,
-      overallImpact: 11,
-    },
-    final_score: 79,
-    status: "PENDING",
-  },
-  {
-    id: 4,
-    student_id: "STU-2091",
-    grade_level: "Class 8",
-    round_number: 1,
-    audio_url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-    transcript:
-      "For one presidential day, I would focus on mental health support in schools and safer cycling lanes in cities. Students need counselors, not just exams, and cities need space where families can move without fear.",
-    ai_feedback:
-      "Mature perspective with policy-aware examples. Excellent clarity and confidence throughout the response.",
-    ai_score: 91,
-    rubric: {
-      content: 18,
-      clarity: 18,
-      confidence: 15,
-      creativity: 12,
-      timeManagement: 14,
-      overallImpact: 14,
-    },
-    final_score: 91,
-    status: "APPROVED",
-  },
-  {
-    id: 5,
-    student_id: "STU-2091",
-    grade_level: "Class 8",
-    round_number: 2,
-    audio_url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
-    transcript:
-      "Talking animals would transform hospitals first. Dogs could calm patients, parrots could repeat medicine schedules, and elephants could carry supplies in flood zones. Communication would make compassion faster.",
-    ai_feedback:
-      "Original angle with social relevance. Strong confidence, though one section repeated similar examples.",
-    ai_score: 86,
-    rubric: {
-      content: 17,
-      clarity: 17,
-      confidence: 14,
-      creativity: 16,
-      timeManagement: 12,
-      overallImpact: 10,
-    },
-    final_score: 86,
-    status: "APPROVED",
-  },
-  {
-    id: 6,
-    student_id: "STU-3310",
-    grade_level: "Class 5",
-    round_number: 1,
-    audio_url: "",
-    transcript:
-      "I would make parks bigger and give every kid a library card. I also want free art classes because drawing helps me think.",
-    ai_feedback:
-      "Sweet and sincere delivery. Content is relevant but brief; expanding with one concrete example would help.",
-    ai_score: 71,
-    rubric: {
-      content: 14,
-      clarity: 14,
-      confidence: 11,
-      creativity: 12,
-      timeManagement: 10,
-      overallImpact: 10,
-    },
-    final_score: 71,
-    status: "PENDING",
-  },
-  {
-    id: 7,
-    student_id: "STU-3310",
-    grade_level: "Class 5",
-    round_number: 2,
-    audio_url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
-    transcript:
-      "If animals talked, my hamster would ask for quieter nights and my fish would request warmer water. The funniest part is cows would start podcasting about grass quality.",
-    ai_feedback:
-      "Playful and memorable. Good use of humor; clarity dips slightly when multiple jokes are stacked together.",
-    ai_score: 76,
-    rubric: {
-      content: 14,
-      clarity: 13,
-      confidence: 12,
-      creativity: 15,
-      timeManagement: 11,
-      overallImpact: 11,
-    },
-    final_score: 76,
-    status: "PENDING",
-  },
-  {
-    id: 8,
-    student_id: "STU-4477",
-    grade_level: "Class 10",
-    round_number: 3,
-    audio_url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
-    transcript:
-      "A whisper in the galaxy crossed a bridge of courage, linking two civilizations that had stopped listening. The story argued that empathy is the real technology of peace.",
-    ai_feedback:
-      "Sophisticated vocabulary and thematic depth. Excellent overall impact with controlled pacing.",
-    ai_score: 94,
-    rubric: {
-      content: 19,
-      clarity: 18,
-      confidence: 15,
-      creativity: 15,
-      timeManagement: 14,
-      overallImpact: 13,
-    },
-    final_score: 94,
-    status: "PENDING",
-  },
-];
+const API_URL = "http://localhost:8000/api/submissions";
 
 const MENU_ITEMS = [
   { id: "reviews", label: "Submission Reviews", icon: ClipboardCheck },
@@ -252,45 +56,129 @@ function StatusBadge({ status }: { status: SubmissionStatus }) {
 }
 
 export function AdminDashboard() {
-  const [submissions, setSubmissions] = useState(INITIAL_SUBMISSIONS);
+  const [submissions, setSubmissions] = useState<AdminSubmission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState<string>("reviews");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | SubmissionStatus>("ALL");
   const [gradeFilter, setGradeFilter] = useState("ALL");
   const [scoreOverrides, setScoreOverrides] = useState<Record<number, number>>({});
+  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<number, string>>({});
+  const [savingApprovalIds, setSavingApprovalIds] = useState<Record<number, boolean>>({});
+  const [savingFeedbackIds, setSavingFeedbackIds] = useState<Record<number, boolean>>({});
+
+  const fetchSubmissions = async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch(API_URL, { signal });
+      if (!response.ok) {
+        throw new Error(`Failed to load submissions (${response.status})`);
+      }
+
+      const data = (await response.json()) as Array<Record<string, unknown>>;
+      const normalized = data.map((item) => {
+        const aiScore = item.ai_score;
+        const finalScore = item.final_score;
+        return {
+          id: Number(item.id),
+          student_id: String(item.student_id ?? ""),
+          grade_level: String(item.grade_level ?? ""),
+          round_number: Number(item.round_number ?? 0),
+          audio_url: String(item.audio_url ?? ""),
+          transcript: item.transcript ? String(item.transcript) : null,
+          ai_feedback: item.ai_feedback ? String(item.ai_feedback) : null,
+          ai_score: typeof aiScore === "number" ? aiScore : aiScore ? Number(aiScore) : null,
+          final_score:
+            typeof finalScore === "number"
+              ? finalScore
+              : finalScore
+                ? Number(finalScore)
+                : null,
+          status: String(item.status ?? "PENDING").toUpperCase(),
+        } satisfies AdminSubmission;
+      });
+
+      setSubmissions(normalized);
+      setError(null);
+      setLoading(false);
+    } catch (fetchError) {
+      if (signal?.aborted) return;
+      console.error("Failed to fetch submissions:", fetchError);
+      setError("Could not load live submissions from the server.");
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void fetchSubmissions(controller.signal);
+    const intervalId = window.setInterval(() => {
+      void fetchSubmissions();
+    }, 5000);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    setFeedbackDrafts((currentDrafts) => {
+      const nextDrafts = { ...currentDrafts };
+      submissions.forEach((submission) => {
+        if (!(submission.id in nextDrafts)) {
+          nextDrafts[submission.id] = submission.ai_feedback ?? "";
+        }
+      });
+      return nextDrafts;
+    });
+  }, [submissions]);
+
+  const mergedSubmissions = useMemo(
+    () =>
+      submissions.map((submission) => ({
+        ...submission,
+        final_score: scoreOverrides[submission.id] ?? submission.final_score,
+      })),
+    [submissions, scoreOverrides]
+  );
 
   const grades = useMemo(
-    () => [...new Set(submissions.map((s) => s.grade_level))].sort(),
-    [submissions]
+    () => [...new Set(mergedSubmissions.map((s) => s.grade_level))].sort(),
+    [mergedSubmissions]
   );
 
   const stats = useMemo(() => {
-    const pending = submissions.filter((s) => s.status === "PENDING").length;
-    const approved = submissions.filter((s) => s.status === "APPROVED").length;
+    const pending = mergedSubmissions.filter((s) => s.status === "PENDING").length;
+    const approved = mergedSubmissions.filter((s) => s.status === "APPROVED").length;
+    const scored = mergedSubmissions.filter((s) => typeof s.final_score === "number");
     const avgScore =
-      submissions.reduce((sum, s) => sum + s.final_score, 0) / submissions.length;
+      scored.length === 0
+        ? 0
+        : scored.reduce((sum, s) => sum + (s.final_score ?? 0), 0) / scored.length;
     return {
       pending,
       approved,
-      total: submissions.length,
+      total: mergedSubmissions.length,
       avgScore: avgScore.toFixed(1),
     };
-  }, [submissions]);
+  }, [mergedSubmissions]);
 
   const filteredSubmissions = useMemo(() => {
-    return submissions.filter((submission) => {
+    return mergedSubmissions.filter((submission) => {
       const matchesSearch =
         searchQuery.trim() === "" ||
         submission.student_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        submission.transcript.toLowerCase().includes(searchQuery.toLowerCase());
+        (submission.transcript ?? "").toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus =
         statusFilter === "ALL" || submission.status === statusFilter;
       const matchesGrade =
         gradeFilter === "ALL" || submission.grade_level === gradeFilter;
       return matchesSearch && matchesStatus && matchesGrade;
     });
-  }, [submissions, searchQuery, statusFilter, gradeFilter]);
+  }, [mergedSubmissions, searchQuery, statusFilter, gradeFilter]);
 
   const toggleExpanded = (id: number) => {
     setExpandedId((current) => (current === id ? null : id));
@@ -298,6 +186,25 @@ export function AdminDashboard() {
 
   const getOverrideScore = (submission: AdminSubmission) =>
     scoreOverrides[submission.id] ?? submission.final_score;
+
+  const updateSubmission = async (
+    submissionId: number,
+    payload: Record<string, unknown>
+  ) => {
+    const response = await fetch(`${API_URL}/${submissionId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update submission (${response.status})`);
+    }
+
+    return (await response.json()) as AdminSubmission;
+  };
 
   const handleScoreChange = (id: number, value: string) => {
     const parsed = Number(value);
@@ -309,18 +216,54 @@ export function AdminDashboard() {
   };
 
   const handleApprove = (id: number) => {
-    const override = scoreOverrides[id];
-    setSubmissions((prev) =>
-      prev.map((submission) =>
-        submission.id === id
-          ? {
-              ...submission,
-              status: "APPROVED",
-              final_score: override ?? submission.final_score,
-            }
-          : submission
-      )
-    );
+    const submission = submissions.find((item) => item.id === id);
+    const override = scoreOverrides[id] ?? submission?.final_score ?? 0;
+
+    setSavingApprovalIds((prev) => ({ ...prev, [id]: true }));
+    void updateSubmission(id, {
+      status: "APPROVED",
+      final_score: override,
+    })
+      .then((updatedSubmission) => {
+        setSubmissions((prev) =>
+          prev.map((item) => (item.id === id ? updatedSubmission : item))
+        );
+        setScoreOverrides((prev) => {
+          const nextOverrides = { ...prev };
+          delete nextOverrides[id];
+          return nextOverrides;
+        });
+      })
+      .catch((updateError) => {
+        console.error("Failed to approve submission:", updateError);
+        setError("Could not save the approved score.");
+      })
+      .finally(() => {
+        setSavingApprovalIds((prev) => ({ ...prev, [id]: false }));
+      });
+  };
+
+  const handleFeedbackSave = (id: number) => {
+    const feedback = feedbackDrafts[id] ?? "";
+    setSavingFeedbackIds((prev) => ({ ...prev, [id]: true }));
+
+    void updateSubmission(id, { ai_feedback: feedback })
+      .then((updatedSubmission) => {
+        setSubmissions((prev) =>
+          prev.map((item) => (item.id === id ? updatedSubmission : item))
+        );
+        setFeedbackDrafts((prev) => ({
+          ...prev,
+          [id]: updatedSubmission.ai_feedback ?? "",
+        }));
+      })
+      .catch((updateError) => {
+        console.error("Failed to save AI feedback:", updateError);
+        setError("Could not save the AI feedback override.");
+      })
+      .finally(() => {
+        setSavingFeedbackIds((prev) => ({ ...prev, [id]: false }));
+      });
   };
 
   return (
@@ -364,6 +307,16 @@ export function AdminDashboard() {
             <p className="text-sm text-[#64748B] mt-1">
               Review AI-graded audio responses and approve final scores.
             </p>
+            {error && (
+              <p className="mt-3 text-sm text-[#B91C1C]">
+                {error}
+              </p>
+            )}
+            {loading && (
+              <p className="mt-3 text-sm text-[#64748B]">
+                Loading live submissions...
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -468,10 +421,10 @@ export function AdminDashboard() {
                             R{submission.round_number} — {roundLabel(submission.round_number)}
                           </td>
                           <td className="px-4 py-3 text-sm text-center font-semibold text-[#1B6B8A]">
-                            {submission.ai_score}
+                            {submission.ai_score ?? "—"}
                           </td>
                           <td className="px-4 py-3 text-sm text-center font-semibold text-[#1E293B]">
-                            {submission.final_score}
+                            {submission.final_score ?? "—"}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <StatusBadge status={submission.status} />
@@ -515,7 +468,7 @@ export function AdminDashboard() {
                                     </p>
                                     <textarea
                                       readOnly
-                                      value={submission.transcript}
+                                      value={submission.transcript ?? ""}
                                       className="w-full h-40 resize-none rounded-md border border-[#E2E8F0] bg-[#F8FAFC] p-3 text-sm text-[#1E293B] focus:outline-none"
                                     />
                                   </div>
@@ -524,42 +477,63 @@ export function AdminDashboard() {
                                   <div className="bg-white rounded-lg border border-[#E2E8F0] p-4">
                                     <div className="flex items-center justify-between mb-4">
                                       <p className="text-xs uppercase tracking-wider text-[#64748B]">
-                                        AI Rubric Breakdown
+                                        Submission Summary
                                       </p>
                                       <span className="text-sm font-bold text-[#1B6B8A]">
-                                        {submission.ai_score} / 100
+                                        {submission.ai_score ?? 0} / 100
                                       </span>
                                     </div>
-                                    <div className="space-y-3">
-                                      {RUBRIC_LABELS.map(({ key, label, max }) => {
-                                        const score = submission.rubric[key];
-                                        const percent = (score / max) * 100;
-                                        return (
-                                          <div key={key}>
-                                            <div className="flex justify-between text-sm mb-1">
-                                              <span className="text-[#475569]">{label}</span>
-                                              <span className="font-medium text-[#1E293B]">
-                                                {score} / {max}
-                                              </span>
-                                            </div>
-                                            <div className="w-full h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
-                                              <div
-                                                className="h-full bg-[#1B6B8A] rounded-full"
-                                                style={{ width: `${percent}%` }}
-                                              />
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                                      <div className="rounded-md bg-[#F8FAFC] p-3">
+                                        <p className="text-[#64748B] text-xs uppercase tracking-wider mb-1">
+                                          Audio URL
+                                        </p>
+                                        <p className="text-[#1E293B] break-all">
+                                          {submission.audio_url || "No file attached"}
+                                        </p>
+                                      </div>
+                                      <div className="rounded-md bg-[#F8FAFC] p-3">
+                                        <p className="text-[#64748B] text-xs uppercase tracking-wider mb-1">
+                                          AI Score
+                                        </p>
+                                        <p className="text-[#1E293B] font-medium">
+                                          {submission.ai_score ?? "—"}
+                                        </p>
+                                      </div>
+                                      <div className="rounded-md bg-[#F8FAFC] p-3">
+                                        <p className="text-[#64748B] text-xs uppercase tracking-wider mb-1">
+                                          Final Score
+                                        </p>
+                                        <p className="text-[#1E293B] font-medium">
+                                          {submission.final_score ?? "—"}
+                                        </p>
+                                      </div>
                                     </div>
                                   </div>
                                   <div className="bg-white rounded-lg border border-[#E2E8F0] p-4">
                                     <p className="text-xs uppercase tracking-wider text-[#64748B] mb-2">
                                       AI Feedback
                                     </p>
-                                    <p className="text-sm text-[#475569] leading-relaxed">
-                                      {submission.ai_feedback}
-                                    </p>
+                                    <textarea
+                                      value={feedbackDrafts[submission.id] ?? submission.ai_feedback ?? ""}
+                                      onChange={(e) =>
+                                        setFeedbackDrafts((prev) => ({
+                                          ...prev,
+                                          [submission.id]: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full h-40 resize-none rounded-md border border-[#CBD5E1] bg-white p-3 text-sm text-[#1E293B] focus:outline-none focus:ring-2 focus:ring-[#1B6B8A]"
+                                      placeholder="Add or override the AI explanation here..."
+                                    />
+                                    <button
+                                      onClick={() => handleFeedbackSave(submission.id)}
+                                      disabled={savingFeedbackIds[submission.id]}
+                                      className="mt-3 w-full h-11 bg-[#374151] text-white font-semibold rounded-md hover:bg-[#1F2937] disabled:bg-[#CBD5E1] disabled:text-[#94A3B8] disabled:cursor-not-allowed transition-colors"
+                                    >
+                                      {savingFeedbackIds[submission.id]
+                                        ? "Saving Feedback..."
+                                        : "Save AI Feedback"}
+                                    </button>
                                   </div>
                                   <div className="bg-white rounded-lg border border-[#E2E8F0] p-4">
                                     <label className="block text-xs uppercase tracking-wider text-[#64748B] mb-2">
@@ -569,7 +543,7 @@ export function AdminDashboard() {
                                       type="number"
                                       min={0}
                                       max={100}
-                                      value={getOverrideScore(submission)}
+                                      value={getOverrideScore(submission) ?? ""}
                                       onChange={(e) =>
                                         handleScoreChange(submission.id, e.target.value)
                                       }
@@ -577,12 +551,14 @@ export function AdminDashboard() {
                                     />
                                     <button
                                       onClick={() => handleApprove(submission.id)}
-                                      disabled={submission.status === "APPROVED"}
+                                      disabled={submission.status === "APPROVED" || savingApprovalIds[submission.id]}
                                       className="mt-4 w-full h-11 bg-[#1B6B8A] text-white font-semibold rounded-md hover:bg-[#155A72] disabled:bg-[#CBD5E1] disabled:text-[#94A3B8] disabled:cursor-not-allowed transition-colors"
                                     >
-                                      {submission.status === "APPROVED"
-                                        ? "Grade Approved"
-                                        : "Approve Grade"}
+                                      {savingApprovalIds[submission.id]
+                                        ? "Saving Approval..."
+                                        : submission.status === "APPROVED"
+                                          ? "Grade Approved"
+                                          : "Approve Grade"}
                                     </button>
                                   </div>
                                 </div>
