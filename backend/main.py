@@ -9,6 +9,11 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
+
+# Load environment variables from root .env
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
+
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
